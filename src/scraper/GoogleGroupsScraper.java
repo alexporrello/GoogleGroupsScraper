@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 
 import org.openqa.selenium.By;
+import org.openqa.selenium.Dimension;
 import org.openqa.selenium.Keys;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -26,15 +27,17 @@ public class GoogleGroupsScraper {
 
 	public static final File LOG           = new File(System.getProperty("user.home") + "\\scraper.log");
 	public static final File SUPPORT_PAGES = new File(System.getProperty("user.home") + "\\scraper.log\\support_tickets");
-	
+
 	private ArrayList<String> logEntries = new ArrayList<String>();
 
 	private String supportURL;
 
-	public GoogleGroupsScraper(String supportURL) {
+	public GoogleGroupsScraper(String supportURL, String geckodriverURL) {
 		this.supportURL = supportURL;
 
-		System.setProperty("webdriver.gecko.driver", getClass().getResource("../geckodriver.exe").getPath());
+		System.setProperty("webdriver.gecko.driver", geckodriverURL);
+
+		scrapeAllTicketURLs(supportURL, 800);
 
 		createOrLoadLog();
 
@@ -98,24 +101,14 @@ public class GoogleGroupsScraper {
 
 		new WebDriverWait(driver, 40).until(ExpectedConditions.elementToBeClickable(By.className("F0XO1GC-p-Q")));
 
-		for(int i = 0; i < 75; i++) {
-			Actions actions = new Actions(driver);
-			actions.keyDown(Keys.CONTROL).sendKeys(Keys.END).perform();
-
-			try {
-				java.lang.Thread.sleep(millis);
-			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
-		}
+		scrollToBottomOfInfiniteScrollPage(driver, millis);
 
 		for (WebElement we : driver.findElements(By.className("F0XO1GC-p-Q"))) {
 			logEntries.add(we.getAttribute("href"));
 		}
 
-		driver.quit();
-
 		writeAllToLog();
+		driver.quit();
 	}
 
 	private WebDriver createWebDriver(String[] args) {
@@ -126,6 +119,30 @@ public class GoogleGroupsScraper {
 		}
 
 		return new FirefoxDriver(options);
+	}
+
+	private void scrollToBottomOfInfiniteScrollPage(WebDriver driver, Long millis) {
+		Dimension start = driver.findElement(By.className("F0XO1GC-b-G")).getSize();
+		Dimension end;
+
+		Boolean match = false;
+
+		while(!match) {
+			start = driver.findElement(By.className("F0XO1GC-b-G")).getSize();
+
+			Actions actions = new Actions(driver);
+			actions.keyDown(Keys.CONTROL).sendKeys(Keys.END).perform();
+
+			try {
+				java.lang.Thread.sleep(millis);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+
+			end = driver.findElement(By.className("F0XO1GC-b-G")).getSize();
+
+			match = start.height == end.height;
+		}
 	}
 
 	private void writeAllToLog() {
