@@ -26,7 +26,7 @@ public class Post {
 	}
 	
 	public String getPost() {
-		return post;
+		return post.replaceAll("\n", "#n#");
 	}
 	
 }

@@ -10,15 +10,19 @@ public class SupportPage extends ArrayList<Post> {
 	private static final long serialVersionUID = -5858917927528574354L;
 
 	public String title;
+	public String url;
 	public String saveTitle;
 
-	public SupportPage(String title) {
+	public SupportPage(String title, String url) {
 		this.title     = title;
-		this.saveTitle = (title.replaceAll("[\\\\/:*?\"<>|]", "_") + ".txt").replaceAll(" ", "_");
+		this.url       = url;
+		this.saveTitle = (title.replaceAll("[\\\\/:*?\"<>|]", "_")).replaceAll(" ", "_");
 		
 		if(this.saveTitle.length() > 200) {
-			this.saveTitle = this.saveTitle.substring(0, 199);
+			this.saveTitle = this.saveTitle.substring(0, 150) + ".xml";
 		}
+		
+		this.saveTitle = this.saveTitle + ".xml";
 	}
 	
 	/**
@@ -47,7 +51,6 @@ public class SupportPage extends ArrayList<Post> {
 				toReturn = toReturn + "#=#=#=#" + "\n" + post.getUsername() + "\n\n" + post.getPost() + "\n";
 			}
 		}
-
 
 		return toReturn;
 	}

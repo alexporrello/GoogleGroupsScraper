@@ -25,33 +25,54 @@ import org.openqa.selenium.support.ui.WebDriverWait;
  */
 public class GoogleGroupsScraper {
 
-	public static final File LOG           = new File(System.getProperty("user.home") + "\\scraper.log");
-	public static final File SUPPORT_PAGES = new File(System.getProperty("user.home") + "\\scraper.log\\support_tickets");
+	/** The default location of the log file, where download info is stored. **/
+	public static final File LOG = new File(System.getProperty("user.home") + "\\scraper.log");
 
+	/** The default location where the support pages files are downloaded locally. **/
+	public static final File SUPPORT_PAGES = new File(System.getProperty("user.home") + "\\support_pages");
+
+	/** Contains all of the lines of the {@link #LOG} file. **/
 	private ArrayList<String> logEntries = new ArrayList<String>();
 
+	/** The URL from which the support pages will be scraped **/
 	private String supportURL;
 
+	/**
+	 * Starts scraping pages.
+	 * @param supportURL the URL from which the support pages will be scraped.
+	 * @param geckodriverURL the URL of the geckodriver. This program uses the mozilla geckodriver.
+	 * The driver for your OS can be downloaded here: https://github.com/mozilla/geckodriver/releases.
+	 */
 	public GoogleGroupsScraper(String supportURL, String geckodriverURL) {
 		this.supportURL = supportURL;
 
 		System.setProperty("webdriver.gecko.driver", geckodriverURL);
 
-		scrapeAllTicketURLs(supportURL, 800);
-
 		createOrLoadLog();
 
 		String[] args = {"headless"};
 		WebDriver driver = createWebDriver(args);
+
+		if(!GoogleGroupsScraper.SUPPORT_PAGES.exists()) {
+			GoogleGroupsScraper.SUPPORT_PAGES.mkdir();
+		}
+
 		for(int i = 0; i < logEntries.size(); i++) {
 			if(!logEntries.get(i).startsWith("#DOWNLOADED#")) {
 				try {
-					new SupportPageScraper(logEntries.get(i), driver, logEntries, i);
+					SupportPageWriter.write(SupportPageScraper.scrape(logEntries.get(i), driver));					
+					logEntries.set(i, "#DOWNLOADED#" + logEntries.get(i));
 					writeAllToLog();
-					break;
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
+			} else {
+				System.err.println("According to scraper.log, this ticket has already been downloaded.\n" +
+						"You can clear the log manually by going to " 
+						+ GoogleGroupsScraper.SUPPORT_PAGES + " and deleting scraper.log.\n"
+						+ "If you want to redownload this support page only, open scraper.log in a text editor and "
+						+ "remove #DOWNLOADED# from the front of this page's URL: "
+						+ logEntries.get(i).replace("#DOWNLOADED#", "") + "\n");
 			}
 		}
 
@@ -68,7 +89,7 @@ public class GoogleGroupsScraper {
 				e.printStackTrace();
 			}
 
-			scrapeAllTicketURLs(supportURL, 800);
+			scrapeAllTicketURLs(supportURL);
 		}
 	}
 
@@ -91,17 +112,16 @@ public class GoogleGroupsScraper {
 	/**
 	 * Scraps all of the child URLs from a Google Groups page.
 	 * @param supportURL the url from which to scrape the ticket urls.
-	 * @param millis when scrolling down a page, this is the time the app pauses between scrolls
 	 * @return a string of all the URLs, separated by a /n
 	 */
-	public void scrapeAllTicketURLs(String supportURL, long millis) {
+	public void scrapeAllTicketURLs(String supportURL) {
 		String[] args = {"headless"};
 		WebDriver driver = createWebDriver(args);
 		driver.get(supportURL);
 
 		new WebDriverWait(driver, 40).until(ExpectedConditions.elementToBeClickable(By.className("F0XO1GC-p-Q")));
 
-		scrollToBottomOfInfiniteScrollPage(driver, millis);
+		scrollToPageBottom(driver, 800);
 
 		for (WebElement we : driver.findElements(By.className("F0XO1GC-p-Q"))) {
 			logEntries.add(we.getAttribute("href"));
@@ -111,17 +131,12 @@ public class GoogleGroupsScraper {
 		driver.quit();
 	}
 
-	private WebDriver createWebDriver(String[] args) {
-		FirefoxOptions options = new FirefoxOptions();
-
-		for(String s : args) {
-			options.addArguments(s);
-		}
-
-		return new FirefoxDriver(options);
-	}
-
-	private void scrollToBottomOfInfiniteScrollPage(WebDriver driver, Long millis) {
+	/**
+	 * Scrolls to the bottom of the infinitely scrolling google groups home page.
+	 * @param driver the web driver used throughout.
+	 * @param millis the time given to the page to load new content after a scroll.
+	 */
+	private void scrollToPageBottom(WebDriver driver, long millis) {
 		Dimension start = driver.findElement(By.className("F0XO1GC-b-G")).getSize();
 		Dimension end;
 
@@ -143,6 +158,16 @@ public class GoogleGroupsScraper {
 
 			match = start.height == end.height;
 		}
+	}
+
+	public static WebDriver createWebDriver(String[] args) {
+		FirefoxOptions options = new FirefoxOptions();
+
+		for(String s : args) {
+			options.addArguments(s);
+		}
+
+		return new FirefoxDriver(options);
 	}
 
 	private void writeAllToLog() {
